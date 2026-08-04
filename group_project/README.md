@@ -69,8 +69,44 @@ Xem code mẫu (DeepEval/RAGAS/TruLens) chi tiết trong `README.md` gốc mục
 
 ## Kiến Trúc Hệ Thống
 
-```
-[Vẽ diagram kiến trúc ở đây]
+```mermaid
+flowchart LR
+    U[User] --> UI[Streamlit / Chainlit Chat UI]
+    UI --> GEN[Task 10: generate_with_citation]
+    GEN --> RET[Task 9: retrieve]
+
+    subgraph Indexing & Data Prep
+        D1[Task 1: Legal PDFs/DOCX]
+        D2[Task 2: News JSON]
+        D3[Task 3: Convert to Markdown]
+        D4[Task 4: Chunking & Indexing]
+        D5[Task 5: Semantic Search]
+        D6[Task 6: Lexical Search]
+        D7[Task 7: Reranking]
+        D8[Task 8: PageIndex Fallback]
+    end
+
+    D1 --> D3
+    D2 --> D3
+    D3 --> D4 --> D5
+    D4 --> D6
+    D5 --> D7
+    D6 --> D7
+    D7 --> RET
+    D8 --> RET
+
+    RET --> GEN
+    GEN --> UI
+
+    subgraph Evaluation
+        E1[group_project/evaluation/golden_dataset.json]
+        E2[group_project/evaluation/eval_pipeline.py]
+        E3[group_project/evaluation/results.md]
+    end
+
+    E1 --> E2 --> E3
+    GEN --> E2
+    RET --> E2
 ```
 
 ---
@@ -79,10 +115,10 @@ Xem code mẫu (DeepEval/RAGAS/TruLens) chi tiết trong `README.md` gốc mục
 
 | Thành viên | MSSV | Nhiệm vụ | Trạng thái |
 |-----------|------|----------|------------|
-| | | | |
-| | | | |
-| | | | |
-| | | | |
+| Hoàng Thành Vinh | 2A202601124 | Role 1: Team Leader & RAG Architect | Done |
+| Hồ Thúy Hằng | 2A202601806 | Role 2: Data & Pipeline Specialist / Data Dev | Done |
+| Ngô Thị Thảo Linh | 2A202601318 | Role 3: Frontend & Chatbot Dev | Done |
+| Trần Minh Hiền | 2A202601300 | Role 4: Evaluation & QA Engineer | Done |
 
 ---
 
