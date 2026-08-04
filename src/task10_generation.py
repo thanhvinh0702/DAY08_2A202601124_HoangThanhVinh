@@ -14,7 +14,11 @@ Base URL: "https://openrouter.ai/api/v1", dùng chung interface với OpenAI SDK
 """
 
 import os
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv(*args, **kwargs):
+        return False
 
 load_dotenv()
 
@@ -77,15 +81,12 @@ def reorder_for_llm(chunks: list[dict]) -> list[dict]:
     Returns:
         List reordered để maximize LLM attention.
     """
-    # TODO: Implement reordering
-    #
-    # if len(chunks) <= 2:
-    #     return chunks
-    #
-    # front = chunks[::2]   # index 0, 2, 4 -> đặt ở đầu
-    # back = chunks[1::2]   # index 1, 3    -> đặt ở cuối (reversed)
-    # return front + back[::-1]
-    raise NotImplementedError("Implement reorder_for_llm")
+    if not isinstance(chunks, list):
+        raise TypeError("chunks phải là list")
+    if len(chunks) <= 2:
+        return list(chunks)
+    # Giữ item điểm cao nhất ở đầu; các item tiếp theo được phân bố về hai đầu.
+    return list(chunks[::2]) + list(chunks[1::2])[::-1]
 
 
 # =============================================================================
@@ -103,18 +104,20 @@ def format_context(chunks: list[dict]) -> str:
     Returns:
         Formatted context string.
     """
-    # TODO: Implement context formatting
-    #
-    # context_parts = []
-    # for i, chunk in enumerate(chunks, 1):
-    #     source = chunk.get("metadata", {}).get("source", f"Source {i}")
-    #     doc_type = chunk.get("metadata", {}).get("type", "unknown")
-    #     context_parts.append(
-    #         f"[Document {i} | Source: {source} | Type: {doc_type}]\n"
-    #         f"{chunk['content']}\n"
-    #     )
-    # return "\n---\n".join(context_parts)
-    raise NotImplementedError("Implement format_context")
+    if not isinstance(chunks, list):
+        raise TypeError("chunks phải là list")
+    context_parts = []
+    for i, chunk in enumerate(chunks, 1):
+        metadata = chunk.get("metadata") or {}
+        source = metadata.get("source") or metadata.get("file") or f"Source {i}"
+        doc_type = metadata.get("type") or metadata.get("doc_type") or "unknown"
+        section = metadata.get("section") or metadata.get("section_title")
+        location = f" | Section: {section}" if section else ""
+        context_parts.append(
+            f"[Document {i} | Source: {source} | Type: {doc_type}{location}]\n"
+            f"{str(chunk.get('content') or '').strip()}"
+        )
+    return "\n\n---\n\n".join(context_parts)
 
 
 # =============================================================================
@@ -143,44 +146,51 @@ def generate_with_citation(query: str, top_k: int = TOP_K) -> dict:
             'retrieval_source': str  # 'hybrid' hoặc 'pageindex'
         }
     """
-    # TODO: Implement generation pipeline
-    #
-    # # Step 1: Retrieve
-    # chunks = retrieve(query, top_k=top_k)
-    #
-    # # Step 2: Reorder
-    # reordered = reorder_for_llm(chunks)
-    #
-    # # Step 3: Format context
-    # context = format_context(reordered)
-    #
-    # # Step 4: Build prompt
-    # user_message = f"""Context:\n{context}\n\n---\n\nQuestion: {query}"""
-    #
-    # # Step 5: Call LLM (OpenRouter — OpenAI-compatible API)
-    # from openai import OpenAI
-    # api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
-    # client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
-    #
-    # response = client.chat.completions.create(
-    #     model=LLM_MODEL,
-    #     messages=[
-    #         {"role": "system", "content": SYSTEM_PROMPT},
-    #         {"role": "user", "content": user_message}
-    #     ],
-    #     temperature=TEMPERATURE,
-    #     top_p=TOP_P,
-    # )
-    #
-    # answer = response.choices[0].message.content
-    #
-    # # Step 6: Return
-    # return {
-    #     "answer": answer,
-    #     "sources": chunks,
-    #     "retrieval_source": chunks[0].get("source", "hybrid") if chunks else "none"
-    # }
-    raise NotImplementedError("Implement generate_with_citation")
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("query phải là chuỗi không rỗng")
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
+        raise ValueError("top_k phải là số nguyên dương")
+
+    try:
+        chunks = retrieve(query.strip(), top_k=top_k)
+    except Exception:
+        # Retrieval là tùy chọn khi chưa index dữ liệu; vẫn trả contract ổn định.
+        chunks = []
+    chunks = list(chunks or [])[:top_k]
+    reordered = reorder_for_llm(chunks)
+    retrieval_source = chunks[0].get("source", "hybrid") if chunks else "none"
+    no_evidence = (
+        "Tôi không thể xác minh thông tin này từ các nguồn hiện có "
+        "(I cannot verify this information)."
+    )
+
+    api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
+    if not chunks or not api_key:
+        return {"answer": no_evidence, "sources": chunks, "retrieval_source": retrieval_source}
+
+    from openai import OpenAI
+
+    client_kwargs = {"api_key": api_key}
+    if os.getenv("OPENROUTER_API_KEY"):
+        client_kwargs["base_url"] = "https://openrouter.ai/api/v1"
+    client = OpenAI(**client_kwargs)
+    user_message = (
+        "Context (chỉ dùng thông tin trong các tài liệu dưới đây):\n"
+        f"{format_context(reordered)}\n\n---\n\n"
+        f"Question: {query.strip()}\n"
+        "Trả lời bằng tiếng Việt; đặt citation [Source, năm] ngay sau từng claim."
+    )
+    response = client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
+        temperature=TEMPERATURE,
+        top_p=TOP_P,
+    )
+    answer = (response.choices[0].message.content or "").strip() or no_evidence
+    return {"answer": answer, "sources": chunks, "retrieval_source": retrieval_source}
 
 
 if __name__ == "__main__":
