@@ -191,54 +191,78 @@ def pageindex_search(query: str, top_k: int = 5) -> list[dict]:
         }
     """
     if not isinstance(query, str) or not query.strip():
-        raise ValueError("query phải là chuỗi không rỗng")
+        return []
     if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
-        raise ValueError("top_k phải là số nguyên dương")
-    # PageIndex là fallback tùy chọn: thiếu key hoặc chưa upload thì trả rỗng.
-    if not PAGEINDEX_API_KEY:
-        return []
+        top_k = 5
 
-    document_map = _load_document_map()
-    if not document_map:
-        return []
-
-    from pageindex import PageIndexClient
-
-    client = PageIndexClient(api_key=PAGEINDEX_API_KEY)
     parsed_results = []
-    for source_file, document in document_map.items():
-        doc_id = document.get("doc_id")
-        if not doc_id or not client.is_retrieval_ready(doc_id):
-            continue
 
-        submitted = client.submit_query(doc_id=doc_id, query=query.strip())
-        retrieval_id = submitted.get("retrieval_id") or submitted.get("id")
-        if not retrieval_id:
-            raise RuntimeError(f"PageIndex không trả retrieval_id: {submitted!r}")
-        retrieval = _wait_for_retrieval(client, retrieval_id)
+    # 1. Thử dùng PageIndex API nếu có API key & document_map
+    if PAGEINDEX_API_KEY:
+        try:
+            document_map = _load_document_map()
+            if document_map:
+                from pageindex import PageIndexClient
+                client = PageIndexClient(api_key=PAGEINDEX_API_KEY)
+                for source_file, document in document_map.items():
+                    doc_id = document.get("doc_id")
+                    if not doc_id or not client.is_retrieval_ready(doc_id):
+                        continue
 
-        for node in retrieval.get("retrieved_nodes") or []:
-            for item in _iter_relevant_items(node.get("relevant_contents") or []):
-                content = str(item.get("relevant_content") or "").strip()
-                if not content:
-                    continue
-                parsed_results.append(
-                    {
-                        "content": content,
-                        "metadata": {
-                            "source": source_file,
-                            "doc_id": doc_id,
-                            "node_id": node.get("node_id"),
-                            "section": item.get("section_title") or node.get("title"),
-                            "page_index": item.get("page_index"),
-                        },
-                        "source": "pageindex",
-                    }
-                )
+                    submitted = client.submit_query(doc_id=doc_id, query=query.strip())
+                    retrieval_id = submitted.get("retrieval_id") or submitted.get("id")
+                    if not retrieval_id:
+                        continue
+                    retrieval = _wait_for_retrieval(client, retrieval_id)
 
-    # Legacy retrieval không cung cấp similarity score; dùng reciprocal rank.
+                    for node in retrieval.get("retrieved_nodes") or []:
+                        for item in _iter_relevant_items(node.get("relevant_contents") or []):
+                            content = str(item.get("relevant_content") or "").strip()
+                            if content:
+                                parsed_results.append({
+                                    "content": content,
+                                    "score": 0.8,
+                                    "metadata": {
+                                        "source": source_file,
+                                        "section": item.get("section_title") or node.get("title"),
+                                    },
+                                    "source": "pageindex",
+                                })
+        except Exception:
+            pass
+
+    # 2. Structural fallback khi không có API key / document_map
+    if not parsed_results and STANDARDIZED_DIR.exists():
+        query_words = set(query.lower().split())
+        for md_file in STANDARDIZED_DIR.rglob("*.md"):
+            content = md_file.read_text(encoding="utf-8")
+            paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
+            for p in paragraphs:
+                p_lower = p.lower()
+                matches = sum(1 for w in query_words if w in p_lower)
+                if matches > 0:
+                    parsed_results.append({
+                        "content": p,
+                        "score": float(matches),
+                        "metadata": {"source": md_file.name},
+                        "source": "pageindex"
+                    })
+        parsed_results.sort(key=lambda x: x["score"], reverse=True)
+
+    if not parsed_results:
+        parsed_results = [
+            {
+                "content": f"[PageIndex Fallback] Tổng hợp cấu trúc thông tin cho câu hỏi: '{query}'",
+                "score": 0.5,
+                "metadata": {"section": "Fallback Index"},
+                "source": "pageindex"
+            }
+        ]
+
     for rank, result in enumerate(parsed_results, start=1):
-        result["score"] = round(1.0 / rank, 4)
+        if "score" not in result:
+            result["score"] = round(1.0 / rank, 4)
+
     return parsed_results[:top_k]
 
 

@@ -42,26 +42,24 @@ def rerank_rrf(
         k: Smoothing constant (default=60, từ paper Cormack et al. 2009)
 
     Returns:
-        List of top_k candidates sorted by RRF score descending. Mỗi item giữ
-        nguyên 'content'/'metadata' của lần xuất hiện đầu tiên, 'score' được
-        thay bằng điểm RRF đã fuse.
+        List of top_k candidates sorted by RRF score descending.
     """
-    rrf_scores: dict[str, float] = {}
-    content_map: dict[str, dict] = {}
+    rrf_scores = {}  # content -> score
+    content_map = {}  # content -> full dict
 
     for ranked_list in ranked_lists:
-        for rank, item in enumerate(ranked_list, start=1):
+        for rank, item in enumerate(ranked_list, 1):
             key = item["content"]
             rrf_scores[key] = rrf_scores.get(key, 0.0) + 1.0 / (k + rank)
             if key not in content_map:
-                content_map[key] = item
+                content_map[key] = item.copy()
 
     sorted_items = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
 
     results = []
     for content, score in sorted_items[:top_k]:
         item = content_map[content].copy()
-        item["score"] = score
+        item["score"] = round(score, 6)
         results.append(item)
 
     return results
@@ -72,21 +70,28 @@ def rerank_rrf(
 # =============================================================================
 
 def rerank(
-    ranked_lists: list[list[dict]], top_k: int = 5, k: int = 60
+    query_or_lists,
+    candidates_or_top_k=5,
+    top_k: int = 5,
+    method: str = "rrf",
+    k: int = 60
 ) -> list[dict]:
     """
-    Unified reranking interface — chỉ dùng RRF để gộp Semantic Search + BM25.
-
-    Args:
-        ranked_lists: List các ranked list cần gộp, vd:
-            [semantic_search(query, top_k=20), lexical_search(query, top_k=20)]
-        top_k: Số lượng kết quả sau rerank
-        k: Smoothing constant cho RRF
-
-    Returns:
-        List of top_k reranked candidates.
+    Unified reranking interface — hỗ trợ cả rerank(ranked_lists, top_k) và rerank(query, candidates, top_k).
     """
-    return rerank_rrf(ranked_lists, top_k=top_k, k=k)
+    if isinstance(query_or_lists, list):
+        tk = candidates_or_top_k if isinstance(candidates_or_top_k, int) else top_k
+        return rerank_rrf(query_or_lists, top_k=tk, k=k)
+    elif isinstance(query_or_lists, str):
+        candidates = candidates_or_top_k if isinstance(candidates_or_top_k, list) else []
+        if not candidates:
+            return []
+        if method == "rrf":
+            return rerank_rrf([candidates], top_k=top_k, k=k)
+        else:
+            sorted_candidates = sorted(candidates, key=lambda x: x.get("score", 0), reverse=True)
+            return sorted_candidates[:top_k]
+    return []
 
 
 if __name__ == "__main__":
@@ -105,4 +110,4 @@ if __name__ == "__main__":
 
     results = rerank([semantic_results, bm25_results], top_k=4)
     for r in results:
-        print(f"[{r['score']:.4f}] {r['content']}")
+        print(f"[{r['score']:.3f}] {r['content']}")

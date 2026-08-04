@@ -1,17 +1,92 @@
 [
   {
-    "question": "Người mua có thể yêu cầu trả hàng/hoàn tiền trong thời hạn bao lâu sau khi nhận hàng?",
-    "expected_answer": "Trong vòng 15 ngày kể từ khi giao hàng thành công (24 giờ đối với thực phẩm tươi sống/đông lạnh).",
-    "expected_context": "Trang Returns and Refunds Policy, mục Return/Refund Eligibility"
-  },
-  {
     "question": "Shopee hỗ trợ những phương thức thanh toán nào?",
-    "expected_answer": "ShopeePay Wallet, thẻ tín dụng/ghi nợ, trả góp qua thẻ, QR Code, chuyển khoản qua app ngân hàng, thẻ NAPAS, Apple Pay, Google Pay, và COD.",
-    "expected_context": "Trang Payment Methods Overview"
+    "expected_answer": "Shopee hỗ trợ các phương thức thanh toán hợp lệ gồm Ví ShopeePay, SPayLater, Thẻ tín dụng/Ghi nợ (Visa, Mastercard, JCB), Thanh toán khi nhận hàng (COD), Chuyển khoản ngân hàng tự động, Google Pay và Apple Pay.",
+    "expected_context": "Trang Payment Methods, mục Phương thức thanh toán hợp lệ trên Shopee"
   },
   {
-    "question": "Người bán không được đăng bán những sản phẩm nào?",
-    "expected_answer": "Hàng giả/nhái, sản phẩm bất hợp pháp, vi phạm sở hữu trí tuệ, và các mặt hàng nằm trong danh sách cấm của sàn.",
-    "expected_context": "Trang Product Listing Regulations, mục Prohibited Content"
+    "question": "Thời hạn người mua có thể gửi yêu cầu trả hàng/hoàn tiền trên Shopee là bao lâu?",
+    "expected_answer": "Thời gian yêu cầu trả hàng/hoàn tiền là trong vòng 7 ngày đối với Shopee Mall và trong vòng 3 ngày đối với shop thường kể từ khi nhận hàng (hoặc 15 ngày theo chính sách mua sắm bảo đảm).",
+    "expected_context": "Trang Returns and Refunds Policy, mục Thời gian yêu cầu trả hàng hoàn tiền"
+  },
+  {
+    "question": "Những trường hợp nào Người mua được phép yêu cầu Trả hàng/Hoàn tiền?",
+    "expected_answer": "Người mua được trả hàng/hoàn tiền khi sản phẩm bị lỗi nhà sản xuất/người bán, hư hỏng trong quá trình vận chuyển, giao sai sản phẩm/màu sắc/kích thước, hoặc hàng nhận được không đúng như mô tả.",
+    "expected_context": "Trang Returns and Refunds Policy, mục Điều kiện trả hàng hoàn tiền"
+  },
+  {
+    "question": "Shopee áp dụng những biện pháp nào để bảo mật thông tin thanh toán của người dùng?",
+    "expected_answer": "Shopee áp dụng mặc định mã hóa SSL 256-bit cho mọi giao dịch thanh toán và yêu cầu xác thực 2 lớp OTP qua SMS/Email đối với các giao dịch có giá trị cao.",
+    "expected_context": "Trang Payment Methods, mục Quy định bảo mật thanh toán"
+  },
+  {
+    "question": "Tôi phải làm gì nếu phát hiện giao dịch lạ phát sinh trên thẻ tín dụng hoặc tài khoản ngân hàng liên kết với Shopee?",
+    "expected_answer": "Người dùng cần ngay lập tức liên hệ ngân hàng phát hành thẻ để khóa thẻ/tài khoản tạm thời, kiểm tra lịch sử giao dịch trên ứng dụng Shopee, và liên hệ với Trung tâm Chăm sóc Khách hàng Shopee để được hỗ trợ kiểm tra và ngăn chặn giao dịch gian lận.",
+    "expected_context": "Trang Bảo mật tài khoản, bài viết Xử lý giao dịch lạ phát sinh trên thẻ tín dụng"
+  },
+  {
+    "question": "Người dùng Shopee cần lưu ý những điều gì để tránh bị lừa đảo khi mua sắm?",
+    "expected_answer": "Tuyệt đối không giao dịch ngoài ứng dụng Shopee, không cung cấp mã OTP/mật khẩu tài khoản cho bất kỳ ai (kể cả nhân viên Shopee), không bấm vào đường link lạ gửi qua tin nhắn/email, và kiểm tra kỹ thông tin đơn hàng trước khi nhận.",
+    "expected_context": "Trang Cảnh báo lừa đảo, bài viết Mua sắm an toàn cùng Shopee"
+  },
+  {
+    "question": "Làm thế nào để liên hệ với bộ phận Chăm sóc khách hàng của Shopee khi cần trợ giúp?",
+    "expected_answer": "Người dùng có thể liên hệ CSKH Shopee qua tính năng Chat trực tiếp với Shopee trên ứng dụng, gọi tổng đài hỗ trợ 19001221, hoặc gửi yêu cầu trợ giúp qua Trung tâm trợ giúp trực tuyến.",
+    "expected_context": "Trang Dịch vụ, bài viết Cách liên hệ Chăm sóc khách hàng Shopee"
+  },
+  {
+    "question": "Tôi muốn đóng góp ý kiến phản hồi hoặc khiếu nại về dịch vụ của Shopee thì làm như thế nào?",
+    "expected_answer": "Người dùng có thể gửi phản hồi qua mục 'Gửi phản hồi/khiếu nại' trong Trung tâm trợ giúp trên ứng dụng Shopee, chọn đúng chủ đề cần góp ý và đính kèm hình ảnh/bằng chứng liên quan.",
+    "expected_context": "Trang Dịch vụ, bài viết Tôi muốn gửi ý kiến phản hồi đến Shopee"
+  },
+  {
+    "question": "Phương thức thanh toán Apple Pay trên Shopee KHÔNG áp dụng cho những đơn hàng nào?",
+    "expected_answer": "Apple Pay không áp dụng cho đơn hàng có sản phẩm thuộc danh mục Nạp thẻ & Dịch vụ, đơn hàng nạp tiền ví điện tử, đơn hàng mua sản phẩm từ người bán nước ngoài không hỗ trợ hoặc thanh toán kết hợp nhiều phương thức.",
+    "expected_context": "Trang Phương thức thanh toán Shopee, bài viết Chi tiết phương thức Apple Pay"
+  },
+  {
+    "question": "Thanh toán bằng Google Pay trên Shopee có giới hạn hoặc lưu ý gì đặc biệt?",
+    "expected_answer": "Google Pay chỉ áp dụng cho giao dịch trên ứng dụng Shopee (không áp dụng bản web), yêu cầu thiết bị hỗ trợ Google Wallet và không áp dụng cho đơn hàng thuộc nhóm Nạp thẻ/Dịch vụ số.",
+    "expected_context": "Trang Phương thức thanh toán Shopee, bài viết Google Pay trên Shopee"
+  },
+  {
+    "question": "SPayLater trên Shopee là gì và do đơn vị nào cung cấp?",
+    "expected_answer": "SPayLater là phương thức thanh toán mua trước trả sau trên Shopee, được cung cấp bởi các Ngân hàng đối tác uy tín cho phép người dùng chia nhỏ khoản thanh toán theo các kỳ hạn.",
+    "expected_context": "Trang Phương thức thanh toán Shopee, mục SPayLater"
+  },
+  {
+    "question": "Người mua có nên thực hiện giao dịch ngoài hệ thống Shopee theo đề nghị của Người bán không?",
+    "expected_answer": "Tuyệt đối KHÔNG thực hiện giao dịch ngoài hệ thống Shopee. Shopee sẽ không chịu trách nhiệm bảo vệ quyền lợi hay giải quyết khiếu nại hoàn tiền nếu giao dịch diễn ra bên ngoài sàn.",
+    "expected_context": "Trang Cảnh báo lừa đảo & Chính sách thanh toán Shopee"
+  },
+  {
+    "question": "Khi nhận hàng bị hư hỏng hoặc thiếu sản phẩm, Người mua cần cung cấp bằng chứng gì?",
+    "expected_answer": "Người mua cần chụp ảnh nét nhãn vận chuyển trên gói hàng, quay video mở hộp (unboxing) rõ mã vận đơn và chụp chi tiết sản phẩm bị lỗi/thiếu để đính kèm khi tạo yêu cầu trả hàng.",
+    "expected_context": "Trang Chính sách Trả hàng và Hoàn tiền Shopee, mục Bằng chứng trả hàng"
+  },
+  {
+    "question": "Chính sách bảo mật của Shopee thu thập những loại thông tin cá nhân nào từ người dùng?",
+    "expected_answer": "Shopee thu thập thông tin cá nhân bao gồm họ tên, số điện thoại, địa chỉ giao hàng, địa chỉ email, thông tin tài khoản thanh toán, địa chỉ IP thiết bị và vị trí địa lý (khi được cho phép).",
+    "expected_context": "Trang Chính sách Bảo mật Shopee, mục Thu thập dữ liệu cá nhân"
+  },
+  {
+    "question": "Shopee Mall là gì và mua hàng tại Shopee Mall có quyền lợi đổi trả gì khác biệt?",
+    "expected_answer": "Shopee Mall là gian hàng chính hãng cam kết 100% hàng thật. Người mua tại Shopee Mall được hưởng chính sách trả hàng/hoàn tiền miễn phí dài hơn (lên tới 7-15 ngày) và được hỗ trợ vận chuyển đổi trả.",
+    "expected_context": "Trang Tổng quan Shopee & Chính sách trả hàng Shopee Mall"
+  },
+  {
+    "question": "Phương thức thanh toán COD trên Shopee quy định như thế nào khi giao hàng?",
+    "expected_answer": "Thanh toán COD cho phép người mua thanh toán tiền mặt cho shipper khi nhận hàng. Người mua cần chuẩn bị đúng số tiền và kiểm tra tình trạng niêm phong gói hàng trước khi thanh toán.",
+    "expected_context": "Trang Phương thức thanh toán, mục Thanh toán COD"
+  },
+  {
+    "question": "Tài khoản Shopee bị khóa/giới hạn đăng nhập vì những lý do nào?",
+    "expected_answer": "Tài khoản bị khóa khi hệ thống phát hiện hành vi vi phạm điều khoản dịch vụ (tạo nhiều tài khoản lạm dụng mã giảm giá, đăng nhập trên thiết bị lạ có dấu hiệu bất thường, gian lận đơn hàng).",
+    "expected_context": "Trang Bảo mật tài khoản & Điều khoản dịch vụ Shopee"
+  },
+  {
+    "question": "Khi đơn hàng hủy hoặc được chấp nhận hoàn tiền, tiền sẽ được trả về đâu và trong bao lâu?",
+    "expected_answer": "Tiền hoàn sẽ được trả về Ví ShopeePay (trong 24h) hoặc về Thẻ tín dụng/Tài khoản ngân hàng đã thanh toán (từ 3 đến 14 ngày làm việc tùy thuộc vào ngân hàng phát hành).",
+    "expected_context": "Trang Chính sách Trả hàng Hoàn tiền, mục Thời gian và phương thức hoàn tiền"
   }
 ]
