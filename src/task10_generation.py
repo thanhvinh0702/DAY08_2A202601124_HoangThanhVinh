@@ -124,7 +124,7 @@ def format_context(chunks: list[dict]) -> str:
 # GENERATION
 # =============================================================================
 
-def generate_with_citation(query: str, top_k: int = TOP_K) -> dict:
+def generate_with_citation(query: str, top_k: int = TOP_K, use_reranking: bool = True) -> dict:
     """
     End-to-end RAG generation có citation.
 
@@ -138,6 +138,8 @@ def generate_with_citation(query: str, top_k: int = TOP_K) -> dict:
 
     Args:
         query: Câu hỏi của user
+        top_k: Số lượng tài liệu tham khảo
+        use_reranking: Có áp dụng RRF reranking hay không
 
     Returns:
         {
@@ -152,7 +154,7 @@ def generate_with_citation(query: str, top_k: int = TOP_K) -> dict:
         raise ValueError("top_k phải là số nguyên dương")
 
     try:
-        chunks = retrieve(query.strip(), top_k=top_k)
+        chunks = retrieve(query.strip(), top_k=top_k, use_reranking=use_reranking)
     except Exception:
         # Retrieval là tùy chọn khi chưa index dữ liệu; vẫn trả contract ổn định.
         chunks = []
