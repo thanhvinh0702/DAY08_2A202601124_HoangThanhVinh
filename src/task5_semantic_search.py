@@ -9,30 +9,23 @@ Yêu cầu:
     - Phải tương thích với embedding model và vector store ở Task 4
 """
 
-from functools import lru_cache
-
-
-@lru_cache(maxsize=1)
-def _get_embedding_model():
-    """Load một lần đúng embedding model được cấu hình ở Task 4."""
-    from sentence_transformers import SentenceTransformer
-
-    try:
-        from .task4_chunking_indexing import EMBEDDING_MODEL
-    except ImportError:  # Hỗ trợ chạy trực tiếp: python src/task5_semantic_search.py
-        from task4_chunking_indexing import EMBEDDING_MODEL
-
-    return SentenceTransformer(EMBEDDING_MODEL)
+try:
+    from .task4_chunking_indexing import (
+        CHROMA_DIR,
+        COLLECTION_NAME,
+        embed_texts,
+    )
+except ImportError:  # Hỗ trợ chạy trực tiếp: python src/task5_semantic_search.py
+    from task4_chunking_indexing import (  # type: ignore
+        CHROMA_DIR,
+        COLLECTION_NAME,
+        embed_texts,
+    )
 
 
 def _get_collection():
     """Mở Chroma collection đã được Task 4 tạo và index."""
     import chromadb
-
-    try:
-        from .task4_chunking_indexing import CHROMA_DIR, COLLECTION_NAME
-    except ImportError:  # Hỗ trợ chạy trực tiếp: python src/task5_semantic_search.py
-        from task4_chunking_indexing import CHROMA_DIR, COLLECTION_NAME
 
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
     try:
@@ -74,8 +67,7 @@ def semantic_search(query: str, top_k: int = 10) -> list[dict]:
     if collection is None or collection.count() == 0:
         return []
 
-    model = _get_embedding_model()
-    query_vector = model.encode(query.strip(), convert_to_numpy=True).tolist()
+    query_vector = embed_texts([query.strip()])[0]
 
     results = collection.query(
         query_embeddings=[query_vector],
