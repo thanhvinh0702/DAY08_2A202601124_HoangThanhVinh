@@ -1,7 +1,9 @@
 # Core
 python-dotenv>=1.0.0
 requests>=2.31.0
-numpy>=1.24.0
+# NumPy 1.26.x does not ship Python 3.13 wheels, so pip falls back to source
+# builds and fails in environments without a C compiler.
+numpy>=2.0.0
 
 # Task 2 - Crawling
 crawl4ai>=0.3.0
@@ -11,14 +13,9 @@ markitdown[pdf]>=0.1.0
 fpdf2>=2.7.0
 
 # Task 4 - Chunking & Indexing
-langchain-text-splitters>=0.2.4,<0.3.0
-chromadb>=0.5.0
-
-# Task 4/5 - Embedding provider (mac dinh: sentence_transformers, local, khong can API key)
-# Doi provider qua bien EMBEDDING_PROVIDER trong .env: sentence_transformers | google | openai
+langchain-text-splitters>=0.2.0
 # sentence-transformers>=2.2.0
-# google-generativeai>=0.5.0  # Chi can neu EMBEDDING_PROVIDER=google (khong can neu dung mac dinh)
-# openai (provider "openai") da co san o muc Task 10 ben duoi, khong can cai them
+chromadb>=0.5.0
 
 # Task 6 - BM25 + TF-IDF
 rank-bm25>=0.2.2
@@ -34,9 +31,11 @@ openai>=1.30.0
 streamlit>=1.35.0
 
 # Group project - Evaluation
-ragas==0.1.21
-datasets>=2.14.0
-langchain-openai>=0.1.25,<0.2.0
+# Optional eval stack. Keep it out of the base install because ragas 0.1.21
+# pulls older LangChain packages that constrain NumPy < 2.
+# ragas==0.1.21
+# datasets>=2.14.0
+# langchain-openai>=0.1.0
 
 # Testing (dung de cham diem bai ca nhan)
 pytest>=7.0.0
