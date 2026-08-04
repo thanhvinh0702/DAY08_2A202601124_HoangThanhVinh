@@ -1,0 +1,68 @@
+{
+  "standardized/legal/payment-methods-shopee.md": {
+    "doc_type": "legal",
+    "title": "Phuong Thuc Thanh Toan Tren Shopee",
+    "topic": "payment_methods",
+    "customer_role": "buyer"
+  },
+  "standardized/legal/privacy-policy-shopee.md": {
+    "doc_type": "legal",
+    "title": "Chinh Sach Bao Mat Thong Tin Nguoi Dung",
+    "topic": "privacy",
+    "customer_role": "both"
+  },
+  "standardized/legal/returns-refund-policy-shopee.md": {
+    "doc_type": "legal",
+    "title": "Chinh Sach Tra Hang Va Hoan Tien Shopee",
+    "topic": "returns_refund",
+    "customer_role": "buyer"
+  },
+  "standardized/legal/shopee_chinh_sach_bao_mat.md": {
+    "doc_type": "legal",
+    "title": "Chinh Sach Bao Mat",
+    "topic": "privacy",
+    "customer_role": "both"
+  },
+  "standardized/legal/shopee_chinh_sach_tra_hang_hoan_tien.md": {
+    "doc_type": "legal",
+    "title": "Chinh Sach Tra Hang Va Hoan Tien Shopee",
+    "topic": "returns_refund",
+    "customer_role": "both"
+  },
+  "standardized/legal/shopee_phuong_thuc_thanh_toan.md": {
+    "doc_type": "legal",
+    "title": "Shopee Hien Dang Co Nhung Phuong Thuc Thanh Toan Nao",
+    "topic": "payment_methods",
+    "customer_role": "buyer"
+  },
+  "standardized/news/article_01.md": {
+    "doc_type": "news",
+    "title": "Mua Sam An Toan Cung Shopee",
+    "topic": "safety",
+    "customer_role": "buyer"
+  },
+  "standardized/news/article_02.md": {
+    "doc_type": "news",
+    "title": "Cach Lien He Cham Soc Khach Hang Shopee",
+    "topic": "customer_service",
+    "customer_role": "buyer"
+  },
+  "standardized/news/article_03.md": {
+    "doc_type": "news",
+    "title": "Giao Dich La Phat Sinh Tren The Tin Dung Hoac Tai Khoan Ngan Hang",
+    "topic": "account_security",
+    "customer_role": "buyer"
+  },
+  "standardized/news/article_04.md": {
+    "doc_type": "news",
+    "title": "Shopee La Gi",
+    "topic": "platform_intro",
+    "customer_role": "both"
+  },
+  "standardized/news/article_05.md": {
+    "doc_type": "news",
+    "title": "Gui Y Kien Phan Hoi Den Shopee",
+    "topic": "feedback",
+    "customer_role": "both"
+  }
+}

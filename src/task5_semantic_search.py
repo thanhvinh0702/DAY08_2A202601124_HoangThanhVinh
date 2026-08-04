@@ -9,18 +9,31 @@ Yêu cầu:
     - Phải tương thích với embedding model và vector store ở Task 4
 """
 
+import logging
+
 try:
     from .task4_chunking_indexing import (
         CHROMA_DIR,
         COLLECTION_NAME,
+        EMBEDDING_DIM,
+        EMBEDDING_MODEL,
+        EMBEDDING_PROVIDER,
         embed_texts,
     )
+    from .retrieval_utils import normalize_customer_role
 except ImportError:  # Hỗ trợ chạy trực tiếp: python src/task5_semantic_search.py
     from task4_chunking_indexing import (  # type: ignore
         CHROMA_DIR,
         COLLECTION_NAME,
+        EMBEDDING_DIM,
+        EMBEDDING_MODEL,
+        EMBEDDING_PROVIDER,
         embed_texts,
     )
+    from retrieval_utils import normalize_customer_role  # type: ignore
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _get_collection():
@@ -42,7 +55,9 @@ def _get_collection():
         raise RuntimeError(f"Không thể mở Chroma collection: {exc}") from exc
 
 
-def semantic_search(query: str, top_k: int = 10) -> list[dict]:
+def semantic_search(
+    query: str, top_k: int = 10, customer_role: str | None = None
+) -> list[dict]:
     """
     Tìm kiếm ngữ nghĩa sử dụng vector similarity.
 
@@ -62,18 +77,56 @@ def semantic_search(query: str, top_k: int = 10) -> list[dict]:
         raise ValueError("query phải là chuỗi không rỗng")
     if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
         raise ValueError("top_k phải là số nguyên dương")
-
     collection = _get_collection()
-    if collection is None or collection.count() == 0:
+    if collection is None:
+        LOGGER.warning("Chroma collection '%s' does not exist", COLLECTION_NAME)
+        return []
+
+    collection_count = collection.count()
+    if collection_count == 0:
+        LOGGER.warning("Chroma collection '%s' is empty", COLLECTION_NAME)
+        return []
+
+    metadata = collection.metadata or {}
+    indexed_model = metadata.get("embedding_model")
+    indexed_provider = metadata.get("embedding_provider")
+    indexed_dim = metadata.get("embedding_dim")
+    mismatch_reasons = []
+    if indexed_model and str(indexed_model) != EMBEDDING_MODEL:
+        mismatch_reasons.append(f"model={indexed_model!r} (runtime={EMBEDDING_MODEL!r})")
+    if indexed_provider and str(indexed_provider) != EMBEDDING_PROVIDER:
+        mismatch_reasons.append(
+            f"provider={indexed_provider!r} (runtime={EMBEDDING_PROVIDER!r})"
+        )
+    if indexed_dim and int(indexed_dim) != EMBEDDING_DIM:
+        mismatch_reasons.append(f"dimension={indexed_dim} (runtime={EMBEDDING_DIM})")
+
+    sample = collection.peek(limit=1)
+    stored_vectors = sample.get("embeddings")
+    if stored_vectors is not None and len(stored_vectors):
+        stored_dim = len(stored_vectors[0])
+        if stored_dim != EMBEDDING_DIM:
+            mismatch_reasons.append(
+                f"stored_dimension={stored_dim} (runtime={EMBEDDING_DIM})"
+            )
+    if mismatch_reasons:
+        LOGGER.error(
+            "Chroma index is incompatible: %s. Run `python src/task4_chunking_indexing.py`.",
+            "; ".join(mismatch_reasons),
+        )
         return []
 
     query_vector = embed_texts([query.strip()])[0]
-
-    results = collection.query(
+    role = normalize_customer_role(customer_role)
+    query_kwargs = dict(
         query_embeddings=[query_vector],
-        n_results=min(top_k, collection.count()),
+        n_results=min(top_k, collection_count),
         include=["documents", "metadatas", "distances"],
     )
+    if role:
+        query_kwargs["where"] = {"customer_role": {"$in": [role, "both"]}}
+
+    results = collection.query(**query_kwargs)
 
     documents = (results.get("documents") or [[]])[0]
     metadatas = (results.get("metadatas") or [[]])[0]
@@ -93,6 +146,13 @@ def semantic_search(query: str, top_k: int = 10) -> list[dict]:
         )
 
     output.sort(key=lambda item: item["score"], reverse=True)
+    LOGGER.info(
+        "Semantic search returned %d/%d chunks | collection=%d role=%s",
+        len(output[:top_k]),
+        top_k,
+        collection_count,
+        role or "all",
+    )
     return output[:top_k]
 
 

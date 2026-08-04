@@ -1,74 +1,70 @@
+"""Task 6 - BM25 lexical retrieval over the same chunks used by Chroma."""
+
+from __future__ import annotations
+
+import logging
 import re
 import unicodedata
-from pathlib import Path
+
 from rank_bm25 import BM25Okapi
-import numpy as np
 
-STANDARDIZED_DIR = Path(__file__).parent.parent / "data" / "standardized"
+try:
+    from .retrieval_utils import normalize_customer_role, role_matches
+    from .task4_chunking_indexing import chunk_documents, load_documents
+except ImportError:  # Support: python src/task6_lexical_search.py
+    from retrieval_utils import normalize_customer_role, role_matches  # type: ignore
+    from task4_chunking_indexing import chunk_documents, load_documents  # type: ignore
 
-CORPUS: list[dict] = []  # List of {'content': str, 'metadata': dict}
+
+LOGGER = logging.getLogger(__name__)
+CORPUS: list[dict] = []
 _BM25_INDEX: BM25Okapi | None = None
 
 
 def remove_accents(input_str: str) -> str:
-    """Loại bỏ dấu tiếng Việt để tăng khả năng matching từ khóa."""
+    """Remove Vietnamese accents while keeping the original token variant too."""
     nfkd_form = unicodedata.normalize("NFKD", input_str)
-    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+    return "".join(c for c in nfkd_form if not unicodedata.combining(c))
 
 
 def tokenize(text: str) -> list[str]:
-    """Tokenize văn bản: tách từ, chuyển chữ thường và tạo biến thể không dấu."""
-    text_lower = text.lower()
-    words = re.findall(r"\w+", text_lower)
-    tokens = []
-    for w in words:
-        tokens.append(w)
-        unaccented = remove_accents(w)
-        if unaccented != w:
+    """Lowercase tokenization with accented and unaccented variants."""
+    tokens: list[str] = []
+    for word in re.findall(r"\w+", str(text or "").lower(), flags=re.UNICODE):
+        tokens.append(word)
+        unaccented = remove_accents(word)
+        if unaccented != word:
             tokens.append(unaccented)
     return tokens
 
 
 def load_corpus_from_standardized() -> list[dict]:
-    """Tải và chia đoạn (chunking) toàn bộ tài liệu .md từ data/standardized/."""
+    """Build BM25 input from Task 4 chunks so both retrievers share metadata."""
+    chunks = chunk_documents(load_documents())
     corpus = []
-    if not STANDARDIZED_DIR.exists():
-        return corpus
-
-    for md_file in STANDARDIZED_DIR.rglob("*.md"):
-        content = md_file.read_text(encoding="utf-8")
-        doc_type = "legal" if "legal" in str(md_file) else "news"
-        doc_title = md_file.stem.replace("-", " ").replace("_", " ")
-
-        paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
-        for i, para in enumerate(paragraphs):
-            indexed_text = f"[{doc_title}] {para}"
-            corpus.append({
-                "content": para,
-                "indexed_text": indexed_text,
-                "metadata": {
-                    "source": md_file.name,
-                    "type": doc_type,
-                    "chunk_index": i
-                }
-            })
+    for chunk in chunks:
+        metadata = dict(chunk.get("metadata") or {})
+        title = metadata.get("title") or metadata.get("source") or ""
+        corpus.append(
+            {
+                "content": chunk.get("content") or "",
+                "indexed_text": f"{title}\n{chunk.get('content') or ''}",
+                "metadata": metadata,
+            }
+        )
+    LOGGER.info("Built BM25 corpus with %d chunks", len(corpus))
     return corpus
 
 
-def build_bm25_index(corpus: list[dict]) -> BM25Okapi:
-    """
-    Xây dựng BM25 index từ corpus.
-
-    Args:
-        corpus: List of {'content': str, 'metadata': dict}
-    """
+def build_bm25_index(corpus: list[dict]) -> BM25Okapi | None:
     if not corpus:
         return None
-    tokenized_corpus = [tokenize(doc.get("indexed_text", doc["content"])) for doc in corpus]
-    return BM25Okapi(tokenized_corpus)
+    return BM25Okapi(
+        [tokenize(doc.get("indexed_text", doc.get("content", ""))) for doc in corpus]
+    )
 
 
-def _ensure_corpus_and_index():
+def _ensure_corpus_and_index() -> None:
     global CORPUS, _BM25_INDEX
     if not CORPUS:
         CORPUS = load_corpus_from_standardized()
@@ -76,52 +72,55 @@ def _ensure_corpus_and_index():
         _BM25_INDEX = build_bm25_index(CORPUS)
 
 
-def lexical_search(query: str, top_k: int = 10) -> list[dict]:
-    """
-    Tìm kiếm từ khóa sử dụng BM25.
+def reset_bm25_cache() -> None:
+    """Clear the process cache after standardized documents change."""
+    global CORPUS, _BM25_INDEX
+    CORPUS = []
+    _BM25_INDEX = None
 
-    Args:
-        query: Câu truy vấn
-        top_k: Số lượng kết quả tối đa
 
-    Returns:
-        List of {
-            'content': str,
-            'score': float,      # BM25 score
-            'metadata': dict
-        }
-        Sorted by score descending.
-    """
+def lexical_search(
+    query: str, top_k: int = 10, customer_role: str | None = None
+) -> list[dict]:
+    """Return positive-score BM25 chunks, optionally scoped by customer role."""
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("query phải là chuỗi không rỗng")
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
+        raise ValueError("top_k phải là số nguyên dương")
+
     _ensure_corpus_and_index()
-
     if not CORPUS or _BM25_INDEX is None:
         return []
 
-    tokenized_query = tokenize(query)
-    if not tokenized_query:
+    query_tokens = tokenize(query)
+    if not query_tokens:
         return []
 
-    scores = _BM25_INDEX.get_scores(tokenized_query)
-
-    top_indices = np.argsort(scores)[::-1]
-
+    scores = _BM25_INDEX.get_scores(query_tokens)
+    ranked_indices = sorted(range(len(scores)), key=lambda index: scores[index], reverse=True)
+    role = normalize_customer_role(customer_role)
     results = []
-    for idx in top_indices:
-        score = float(scores[idx])
-        results.append({
-            "content": CORPUS[idx]["content"],
-            "score": score,
-            "metadata": CORPUS[idx]["metadata"]
-        })
+    for index in ranked_indices:
+        score = float(scores[index])
+        if score <= 0:
+            break
+        metadata = CORPUS[index]["metadata"]
+        if not role_matches(metadata.get("customer_role"), role):
+            continue
+        results.append(
+            {
+                "content": CORPUS[index]["content"],
+                "score": round(score, 4),
+                "metadata": metadata,
+            }
+        )
         if len(results) >= top_k:
             break
 
+    LOGGER.info("BM25 returned %d/%d chunks | role=%s", len(results), top_k, role or "all")
     return results
 
 
 if __name__ == "__main__":
-    # Test
-    results = lexical_search("phương thức thanh toán shopee", top_k=5)
-    for r in results:
-        print(f"[{r['score']:.3f}] {r['content'][:100]}...")
-
+    for result in lexical_search("phương thức thanh toán shopee", top_k=5):
+        print(f"[{result['score']:.3f}] {result['content'][:100]}...")

@@ -23,9 +23,11 @@ có field "deprecation" cảnh báo) và trả kết quả trong "retrieved_node
 """
 
 import json
+import logging
 import os
 import re
 import time
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 try:
@@ -36,12 +38,20 @@ except ImportError:  # Cho phép import module khi dependency tùy chọn chưa 
 
 load_dotenv()
 
+try:
+    from .retrieval_utils import normalize_customer_role, role_matches
+    from .task4_chunking_indexing import chunk_documents, load_documents
+except ImportError:  # Support: python src/task8_pageindex_vectorless.py
+    from retrieval_utils import normalize_customer_role, role_matches  # type: ignore
+    from task4_chunking_indexing import chunk_documents, load_documents  # type: ignore
+
 PAGEINDEX_API_KEY = os.getenv("PAGEINDEX_API_KEY", "")
 STANDARDIZED_DIR = Path(__file__).parent.parent / "data" / "standardized"
 DOCUMENT_MAP_PATH = Path(__file__).parent.parent / "data" / "pageindex_documents.json"
 UPLOAD_DIR = Path(__file__).parent.parent / "data" / "pageindex_uploads"
 POLL_INTERVAL_SECONDS = 2
 POLL_TIMEOUT_SECONDS = 180
+LOGGER = logging.getLogger(__name__)
 
 
 def _require_api_key() -> None:
@@ -173,7 +183,15 @@ def _iter_relevant_items(value):
                     yield from _iter_relevant_items(child)
 
 
-def pageindex_search(query: str, top_k: int = 5) -> list[dict]:
+def _search_tokens(text: str) -> set[str]:
+    normalized = unicodedata.normalize("NFKD", str(text or "").lower())
+    unaccented = "".join(c for c in normalized if not unicodedata.combining(c))
+    return set(re.findall(r"\w+", unaccented, flags=re.UNICODE))
+
+
+def pageindex_search(
+    query: str, top_k: int = 5, customer_role: str | None = None
+) -> list[dict]:
     """
     Vectorless retrieval sử dụng PageIndex.
     Dùng làm fallback khi hybrid search không có kết quả tốt.
@@ -196,6 +214,11 @@ def pageindex_search(query: str, top_k: int = 5) -> list[dict]:
         top_k = 5
 
     parsed_results = []
+    role = normalize_customer_role(customer_role)
+    documents = load_documents()
+    metadata_by_path = {
+        doc["metadata"].get("path"): doc["metadata"] for doc in documents
+    }
 
     # 1. Thử dùng PageIndex API nếu có API key & document_map
     if PAGEINDEX_API_KEY:
@@ -205,6 +228,9 @@ def pageindex_search(query: str, top_k: int = 5) -> list[dict]:
                 from pageindex import PageIndexClient
                 client = PageIndexClient(api_key=PAGEINDEX_API_KEY)
                 for source_file, document in document_map.items():
+                    source_metadata = metadata_by_path.get(source_file, {})
+                    if not role_matches(source_metadata.get("customer_role"), role):
+                        continue
                     doc_id = document.get("doc_id")
                     if not doc_id or not client.is_retrieval_ready(doc_id):
                         continue
@@ -225,44 +251,43 @@ def pageindex_search(query: str, top_k: int = 5) -> list[dict]:
                                     "metadata": {
                                         "source": source_file,
                                         "section": item.get("section_title") or node.get("title"),
+                                        **source_metadata,
                                     },
                                     "source": "pageindex",
                                 })
         except Exception:
-            pass
+            LOGGER.exception("PageIndex API retrieval failed; trying structural fallback")
 
-    # 2. Structural fallback khi không có API key / document_map
-    if not parsed_results and STANDARDIZED_DIR.exists():
-        query_words = set(query.lower().split())
-        for md_file in STANDARDIZED_DIR.rglob("*.md"):
-            content = md_file.read_text(encoding="utf-8")
-            paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
-            for p in paragraphs:
-                p_lower = p.lower()
-                matches = sum(1 for w in query_words if w in p_lower)
-                if matches > 0:
-                    parsed_results.append({
-                        "content": p,
-                        "score": float(matches),
-                        "metadata": {"source": md_file.name},
-                        "source": "pageindex"
-                    })
+    # 2. Offline structural fallback over the same chunks as Task 4.
+    if not parsed_results and documents:
+        query_words = _search_tokens(query)
+        for chunk in chunk_documents(documents):
+            metadata = chunk.get("metadata") or {}
+            if not role_matches(metadata.get("customer_role"), role):
+                continue
+            chunk_words = _search_tokens(chunk.get("content") or "")
+            matches = len(query_words & chunk_words)
+            if matches:
+                parsed_results.append(
+                    {
+                        "content": chunk.get("content") or "",
+                        "score": round(matches / max(len(query_words), 1), 4),
+                        "metadata": metadata,
+                        "source": "structural",
+                    }
+                )
         parsed_results.sort(key=lambda x: x["score"], reverse=True)
-
-    if not parsed_results:
-        parsed_results = [
-            {
-                "content": f"[PageIndex Fallback] Tổng hợp cấu trúc thông tin cho câu hỏi: '{query}'",
-                "score": 0.5,
-                "metadata": {"section": "Fallback Index"},
-                "source": "pageindex"
-            }
-        ]
 
     for rank, result in enumerate(parsed_results, start=1):
         if "score" not in result:
             result["score"] = round(1.0 / rank, 4)
 
+    LOGGER.info(
+        "PageIndex/structural returned %d/%d chunks | role=%s",
+        len(parsed_results[:top_k]),
+        top_k,
+        role or "all",
+    )
     return parsed_results[:top_k]
 
 

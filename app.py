@@ -1,77 +1,330 @@
-"""Cute Streamlit UI for the e-commerce RAG assistant."""
+"""Streamlit chat UI for the Mầm e-commerce RAG assistant."""
+
+from __future__ import annotations
+
+import html
+import logging
+import os
 import sys
 from pathlib import Path
+
 import streamlit as st
+
 try:
     from dotenv import load_dotenv
-    load_dotenv()
 except ImportError:
-    pass
+    def load_dotenv(*args, **kwargs):
+        return False
+
+
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
-st.set_page_config(page_title="Mầm · E-commerce Assistant", page_icon="🌱", layout="wide")
-st.markdown("""
-<style>
-:root{--mint:#E8F5E9;--sage:#A5D6A7;--leaf:#66BB6A;--forest:#1B5E20}
-.stApp{background:linear-gradient(135deg,#E8F5E9,#F8FFF8 50%,#E8F5E9)}
-[data-testid="stSidebar"]{background:linear-gradient(180deg,#1B5E20,#2E7D32)}
-[data-testid="stSidebar"] *{color:#F1FFF2!important}
-[data-testid="stSidebar"] .stButton>button{border:1px solid #A5D6A7;border-radius:14px;background:#ffffff18;text-align:left;font-size:.86rem}
-[data-testid="stSidebar"] .stButton>button:hover{background:#66BB6A;transform:translateY(-1px)}
-.hero{background:#fff;border:2px solid #A5D6A7;border-radius:28px;padding:24px 30px;box-shadow:0 10px 30px #1b5e2018;margin-bottom:16px}
-.hero h1{color:#1B5E20;margin:0;font-size:2rem}.hero p{color:#558B5A;margin:.4rem 0 0}
-.welcome{background:#ffffffb8;border:1px dashed #66BB6A;border-radius:22px;padding:25px;text-align:center;color:#356B3A;margin:18px 0}
-[data-testid="stChatMessage"]{border-radius:22px;padding:10px 15px;margin:10px 0}
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]){background:#DDF2DF}
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]){background:#fff;border:1px solid #C8E8CA;box-shadow:0 4px 14px #1b5e2010}
-[data-testid="stChatInput"]{background:#fff;border:2px solid #A5D6A7;border-radius:20px}
-[data-testid="stChatInput"]:focus-within{border-color:#66BB6A;box-shadow:0 0 0 3px #66bb6a2e}
-.source-card{background:#F5FFF5;border:1px solid #A5D6A7;border-radius:14px;padding:10px 13px;margin:7px 0}.source-title{color:#1B5E20;font-weight:700}.source-meta{color:#67946B;font-size:.78rem}
-div[data-testid="stExpander"]{border-color:#A5D6A7;border-radius:15px;background:#ffffff80}
-</style>
-""", unsafe_allow_html=True)
+load_dotenv()
 
-SUGGESTIONS=["Thời hạn yêu cầu trả hàng/hoàn tiền là bao lâu?","Shopee hỗ trợ những phương thức thanh toán nào?","Làm sao để đổi phương thức thanh toán đơn hàng?","Quy định về đăng bán sản phẩm cho người bán?","Cách mua hàng trên Shopee của quốc gia khác?"]
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=os.getenv("LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+LOGGER = logging.getLogger(__name__)
+
+st.set_page_config(
+    page_title="Mầm | Trợ lý Shopee",
+    page_icon="🌱",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+st.markdown(
+    """
+    <style>
+    :root {
+        --surface: #ffffff;
+        --surface-soft: #f5faf5;
+        --surface-muted: #edf6ee;
+        --line: #d8e8da;
+        --text: #17251a;
+        --text-muted: #607363;
+        --forest: #1b5e20;
+        --leaf: #43a047;
+        --sage: #a5d6a7;
+        --warm: #f4a261;
+    }
+    [data-testid="stHeader"] {
+        height: 3rem;
+        background: rgba(251,253,251,.94);
+        border-bottom: 1px solid #edf2ed;
+    }
+    [data-testid="stToolbar"] { display: none; }
+    [data-testid="stAppViewContainer"] { background: #fbfdfb; }
+    .main .block-container {
+        max-width: 960px;
+        padding-top: 4.1rem;
+        padding-bottom: 7rem;
+    }
+    [data-testid="stSidebar"] {
+        background: var(--forest);
+        border-right: 0;
+    }
+    [data-testid="stSidebar"] > div:first-child { padding-top: 1.1rem; }
+    [data-testid="stSidebar"] * { color: #f4fff5; }
+    [data-testid="stSidebar"] hr { border-color: rgba(255,255,255,.18); }
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] { opacity: .78; }
+    [data-testid="stSidebar"] .stButton button {
+        min-height: 2.6rem;
+        border: 1px solid rgba(255,255,255,.18);
+        border-radius: 8px;
+        background: rgba(255,255,255,.07);
+        text-align: left;
+        justify-content: flex-start;
+        transition: background .16s ease, border-color .16s ease;
+    }
+    [data-testid="stSidebar"] .stButton button:hover {
+        background: rgba(255,255,255,.15);
+        border-color: rgba(255,255,255,.38);
+    }
+    [data-testid="stSidebar"] [role="radiogroup"] {
+        background: rgba(255,255,255,.08);
+        border-radius: 8px;
+        padding: .35rem .55rem;
+    }
+    .brand-row {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        padding: .2rem 0 1rem;
+    }
+    .brand-mark {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--leaf);
+        color: white;
+        font-size: 1.25rem;
+        font-weight: 800;
+    }
+    .brand-name { color: var(--text); font-size: 1.05rem; font-weight: 750; }
+    .brand-subtitle { color: var(--text-muted); font-size: .8rem; margin-top: .05rem; }
+    .welcome {
+        padding: 4rem 1rem 2rem;
+        text-align: center;
+    }
+    .welcome-mark {
+        width: 48px;
+        height: 48px;
+        margin: 0 auto 1rem;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--forest);
+        color: white;
+        font-size: 1.4rem;
+    }
+    .welcome h1 {
+        margin: 0;
+        color: var(--text);
+        font-size: 1.75rem;
+        letter-spacing: 0;
+    }
+    .welcome p { margin: .6rem 0 0; color: var(--text-muted); }
+    [data-testid="stChatMessage"] {
+        padding: 1rem 1.1rem;
+        margin: .55rem 0;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        background: transparent;
+    }
+    [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+        background: var(--surface-muted);
+        border-color: var(--line);
+    }
+    [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
+        background: var(--surface);
+        border-color: #e8eee9;
+    }
+    [data-testid="stChatInput"] {
+        border: 1px solid #bdd8c0;
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: 0 8px 28px rgba(27,94,32,.09);
+    }
+    [data-testid="stChatInput"]:focus-within {
+        border-color: var(--leaf);
+        box-shadow: 0 0 0 3px rgba(67,160,71,.12), 0 8px 28px rgba(27,94,32,.09);
+    }
+    .source-card {
+        margin: .55rem 0;
+        padding: .8rem .9rem;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface-soft);
+    }
+    .source-title { color: var(--forest); font-weight: 700; }
+    .source-meta { margin: .18rem 0 .5rem; color: var(--text-muted); font-size: .78rem; }
+    .source-content { color: #344a38; font-size: .88rem; line-height: 1.55; }
+    div[data-testid="stExpander"] {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface-soft);
+    }
+    @media (max-width: 700px) {
+        .main .block-container { padding: 3.8rem .8rem 6.5rem; }
+        .welcome { padding-top: 2.5rem; }
+        .welcome h1 { font-size: 1.45rem; }
+        [data-testid="stChatMessage"] { padding: .8rem; }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+SUGGESTIONS = [
+    "Thời hạn yêu cầu trả hàng/hoàn tiền là bao lâu?",
+    "Shopee hỗ trợ những phương thức thanh toán nào?",
+    "Làm sao để đổi phương thức thanh toán đơn hàng?",
+    "Quy định về đăng bán sản phẩm cho người bán?",
+    "Cách mua hàng trên Shopee của quốc gia khác?",
+]
+ROLE_OPTIONS = {
+    "Tự động": None,
+    "Người mua": "buyer",
+    "Người bán": "seller",
+}
+
+
+def render_sources(sources: list[dict]) -> None:
+    if not sources:
+        return
+    with st.expander(f"Nguồn tham khảo · {len(sources)} đoạn", expanded=False):
+        for index, source in enumerate(sources, 1):
+            metadata = source.get("metadata") or {}
+            name = metadata.get("title") or metadata.get("source") or "Nguồn không xác định"
+            kind = metadata.get("type") or metadata.get("doc_type") or "tài liệu"
+            topic = metadata.get("topic")
+            role = metadata.get("customer_role")
+            method = source.get("retrieval_method") or source.get("source")
+            score = source.get("score")
+            details = [str(kind)]
+            if topic:
+                details.append(str(topic))
+            if role:
+                details.append(str(role))
+            if method:
+                details.append(str(method))
+            if score is not None:
+                details.append(f"score {float(score):.4f}")
+            content = str(source.get("content") or "").strip()
+            if len(content) > 480:
+                content = f"{content[:480].rstrip()}..."
+            st.markdown(
+                '<div class="source-card">'
+                f'<div class="source-title">[{index}] {html.escape(str(name))}</div>'
+                f'<div class="source-meta">{html.escape(" · ".join(details))}</div>'
+                f'<div class="source-content">{html.escape(content)}</div>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "pending_query" not in st.session_state:
+    st.session_state.pending_query = None
+
 with st.sidebar:
-    st.markdown("# 🌿 Mầm trợ lý")
-    st.caption("Hỏi đáp chính sách e-commerce thật nhẹ nhàng và dễ hiểu.")
-    st.divider(); st.subheader("💡 Câu hỏi gợi ý")
-    for i,suggestion in enumerate(SUGGESTIONS):
-        if st.button(suggestion,use_container_width=True,key=f"suggestion_{i}"): st.session_state.pending_query=suggestion
-    st.divider(); st.subheader("⚙️ Thiết lập")
-    top_k=st.slider("Số tài liệu tham khảo (top_k)",3,10,5,help="Số chunks đưa vào ngữ cảnh.")
-    st.caption(f"Đang dùng **{top_k}** nguồn gần nhất")
-    st.divider(); st.caption("**Pipeline:** Semantic + BM25 → RRF → PageIndex → LLM citation")
+    st.markdown("## Mầm")
+    st.caption("Trợ lý chính sách Shopee")
+    st.divider()
+    st.caption("CÂU HỎI GỢI Ý")
+    for index, suggestion in enumerate(SUGGESTIONS):
+        if st.button(suggestion, use_container_width=True, key=f"suggestion_{index}"):
+            st.session_state.pending_query = suggestion
+    st.divider()
+    st.caption("NGỮ CẢNH")
+    selected_role_label = st.radio(
+        "Vai trò khách hàng",
+        options=list(ROLE_OPTIONS),
+        horizontal=False,
+        label_visibility="collapsed",
+    )
+    customer_role = ROLE_OPTIONS[selected_role_label]
+    top_k = st.slider("Số nguồn", min_value=3, max_value=10, value=5)
+    st.divider()
+    if st.button("Xóa hội thoại", use_container_width=True):
+        st.session_state.messages = []
+        st.session_state.pending_query = None
+        st.rerun()
 
-if "messages" not in st.session_state: st.session_state.messages=[]
-if "pending_query" not in st.session_state: st.session_state.pending_query=None
-st.markdown('<div class="hero"><h1>🌱 Trợ lý Shopee thân thiện</h1><p>Hỏi mình về thanh toán, đổi trả, giao hàng và chính sách mua sắm nhé ✨</p></div>',unsafe_allow_html=True)
+st.markdown(
+    '<div class="brand-row"><div class="brand-mark">M</div>'
+    '<div><div class="brand-name">Mầm</div>'
+    '<div class="brand-subtitle">Hỗ trợ chính sách Shopee</div></div></div>',
+    unsafe_allow_html=True,
+)
 
-def render_sources(sources):
-    if not sources:return
-    with st.expander(f"📚 Nguồn tham khảo · {len(sources)} tài liệu"):
-        for i,source in enumerate(sources,1):
-            meta=source.get("metadata") or {}; name=meta.get("source") or meta.get("file") or "Nguồn không xác định"; kind=meta.get("type") or meta.get("doc_type") or "tài liệu"; section=meta.get("section") or meta.get("section_title"); score=source.get("score"); details=kind+(f" · {section}" if section else "")
-            if score is not None: details+=f" · độ phù hợp {float(score):.3f}"
-            content=str(source.get("content") or "").strip(); content=content[:360].rstrip()+"…" if len(content)>360 else content
-            st.markdown(f'<div class="source-card"><div class="source-title">[{i}] {name}</div><div class="source-meta">{details}</div><div>{content}</div></div>',unsafe_allow_html=True)
+if not st.session_state.messages:
+    st.markdown(
+        '<div class="welcome"><div class="welcome-mark">M</div>'
+        '<h1>Mình có thể giúp gì cho bạn?</h1>'
+        '<p>Hỏi về thanh toán, đổi trả, giao hàng hoặc chính sách tài khoản.</p></div>',
+        unsafe_allow_html=True,
+    )
 
-if not st.session_state.messages: st.markdown('<div class="welcome"><div style="font-size:2.2rem">🪴</div><h3 style="color:#1B5E20;margin:.3rem 0">Xin chào, mình là Mầm!</h3><p>Chọn một câu hỏi bên trái hoặc gõ câu hỏi bên dưới để bắt đầu nhé.</p></div>',unsafe_allow_html=True)
 for message in st.session_state.messages:
-    with st.chat_message(message["role"],avatar="🌱" if message["role"]=="assistant" else "🧑‍💻"):
+    avatar = "🌱" if message["role"] == "assistant" else "👤"
+    with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
-        if message["role"]=="assistant": render_sources(message.get("sources",[]))
+        if message["role"] == "assistant":
+            render_sources(message.get("sources", []))
 
-typed_query=st.chat_input("Nhập câu hỏi về chính sách/hỗ trợ e-commerce…"); query=typed_query or st.session_state.pending_query
+typed_query = st.chat_input("Hỏi Mầm về chính sách Shopee...")
+query = typed_query or st.session_state.pending_query
 if query:
-    st.session_state.pending_query=None; st.session_state.messages.append({"role":"user","content":query})
-    with st.chat_message("user",avatar="🧑‍💻"): st.markdown(query)
-    with st.chat_message("assistant",avatar="🌱"):
-        with st.spinner("Mầm đang tìm tài liệu phù hợp…"):
+    query = str(query).strip()
+    st.session_state.pending_query = None
+    LOGGER.info("UI query=%r | top_k=%d role=%s", query, top_k, customer_role or "auto")
+    st.session_state.messages.append({"role": "user", "content": query})
+
+    with st.chat_message("user", avatar="👤"):
+        st.markdown(query)
+
+    with st.chat_message("assistant", avatar="🌱"):
+        with st.spinner("Mầm đang tìm trong tài liệu..."):
             try:
                 from src.task10_generation import generate_with_citation
-                response=generate_with_citation(query,top_k=top_k); answer=response.get("answer","Chưa thể trả lời."); sources=response.get("sources",[])
-            except Exception as exc:
-                answer=f"⚠️ Chưa thể kết nối pipeline: `{exc}`"; sources=[]
-        st.markdown(answer); render_sources(sources)
-    st.session_state.messages.append({"role":"assistant","content":answer,"sources":sources})
+
+                response = generate_with_citation(
+                    query,
+                    top_k=top_k,
+                    customer_role=customer_role,
+                )
+                answer = response.get("answer") or "Chưa thể tạo câu trả lời."
+                sources = response.get("sources") or []
+                status = response.get("status", "ok")
+                LOGGER.info(
+                    "UI response | status=%s sources=%d retrieval=%s",
+                    status,
+                    len(sources),
+                    response.get("retrieval_source"),
+                )
+            except Exception:
+                LOGGER.exception("UI pipeline failed")
+                answer = "Mầm chưa thể kết nối pipeline lúc này. Vui lòng kiểm tra log và thử lại."
+                sources = []
+                status = "pipeline_error"
+
+        st.markdown(answer)
+        if status in {"retrieval_error", "configuration_error", "generation_error", "pipeline_error"}:
+            st.caption("Hệ thống chưa sẵn sàng đầy đủ. Chi tiết đã được ghi trong terminal.")
+        render_sources(sources)
+
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": answer,
+            "sources": sources,
+            "status": status,
+        }
+    )

@@ -14,7 +14,7 @@ fpdf2>=2.7.0
 
 # Task 4 - Chunking & Indexing
 langchain-text-splitters>=0.2.0
-# sentence-transformers>=2.2.0
+sentence-transformers>=2.2.0
 chromadb>=0.5.0
 
 # Task 6 - BM25 + TF-IDF
