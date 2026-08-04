@@ -9,6 +9,45 @@ Yêu cầu:
     - Phải tương thích với embedding model và vector store ở Task 4
 """
 
+from functools import lru_cache
+
+
+@lru_cache(maxsize=1)
+def _get_embedding_model():
+    """Load một lần đúng embedding model được cấu hình ở Task 4."""
+    from sentence_transformers import SentenceTransformer
+
+    try:
+        from .task4_chunking_indexing import EMBEDDING_MODEL
+    except ImportError:  # Hỗ trợ chạy trực tiếp: python src/task5_semantic_search.py
+        from task4_chunking_indexing import EMBEDDING_MODEL
+
+    return SentenceTransformer(EMBEDDING_MODEL)
+
+
+def _get_collection():
+    """Mở Chroma collection đã được Task 4 tạo và index."""
+    import chromadb
+
+    try:
+        from .task4_chunking_indexing import CHROMA_DIR, COLLECTION_NAME
+    except ImportError:  # Hỗ trợ chạy trực tiếp: python src/task5_semantic_search.py
+        from task4_chunking_indexing import CHROMA_DIR, COLLECTION_NAME
+
+    client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+    try:
+        return client.get_collection(name=COLLECTION_NAME)
+    except Exception as exc:
+        # Chroma dùng các exception khác nhau giữa các phiên bản. Chỉ coi đây
+        # là collection chưa được index nếu tên collection thực sự không tồn tại.
+        existing_names = {
+            getattr(collection, "name", str(collection))
+            for collection in client.list_collections()
+        }
+        if COLLECTION_NAME not in existing_names:
+            return None
+        raise RuntimeError(f"Không thể mở Chroma collection: {exc}") from exc
+
 
 def semantic_search(query: str, top_k: int = 10) -> list[dict]:
     """
@@ -26,38 +65,43 @@ def semantic_search(query: str, top_k: int = 10) -> list[dict]:
         }
         Sorted by score descending.
     """
-    # TODO: Implement semantic search
-    #
-    # Bước 1: Embed query bằng cùng model ở Task 4
-    # Bước 2: Query vector store (cosine similarity)
-    # Bước 3: Return top_k results
-    #
-    # Ví dụ với ChromaDB:
-    # from .task4_chunking_indexing import get_collection, get_embedding_model
-    #
-    # model = get_embedding_model()
-    # query_vector = model.encode(query).tolist()
-    # (Nếu Task 4 dùng embed_texts() dispatch theo EMBEDDING_PROVIDER thì gọi
-    #  embed_texts([query])[0] ở đây thay vì get_embedding_model().encode() —
-    #  để Task 5 tự động dùng đúng provider mà không cần sửa lại.)
-    #
-    # collection = get_collection()
-    # results = collection.query(
-    #     query_embeddings=[query_vector],
-    #     n_results=top_k,
-    #     include=["documents", "metadatas", "distances"],
-    # )
-    #
-    # output = []
-    # for doc, meta, dist in zip(
-    #     results["documents"][0], results["metadatas"][0], results["distances"][0]
-    # ):
-    #     score = max(0.0, 1.0 - dist)  # cosine distance → similarity
-    #     output.append({"content": doc, "score": round(score, 4), "metadata": meta})
-    #
-    # output.sort(key=lambda x: x["score"], reverse=True)
-    # return output[:top_k]
-    raise NotImplementedError("Implement semantic_search")
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("query phải là chuỗi không rỗng")
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
+        raise ValueError("top_k phải là số nguyên dương")
+
+    collection = _get_collection()
+    if collection is None or collection.count() == 0:
+        return []
+
+    model = _get_embedding_model()
+    query_vector = model.encode(query.strip(), convert_to_numpy=True).tolist()
+
+    results = collection.query(
+        query_embeddings=[query_vector],
+        n_results=min(top_k, collection.count()),
+        include=["documents", "metadatas", "distances"],
+    )
+
+    documents = (results.get("documents") or [[]])[0]
+    metadatas = (results.get("metadatas") or [[]])[0]
+    distances = (results.get("distances") or [[]])[0]
+
+    output = []
+    for document, metadata, distance in zip(documents, metadatas, distances):
+        # Collection ở Task 4 dùng hnsw:space="cosine", do đó similarity = 1 - distance.
+        # Clamp để tránh sai số dấu phẩy động vượt nhẹ khỏi miền cosine [-1, 1].
+        score = max(-1.0, min(1.0, 1.0 - float(distance)))
+        output.append(
+            {
+                "content": document or "",
+                "score": round(score, 4),
+                "metadata": metadata or {},
+            }
+        )
+
+    output.sort(key=lambda item: item["score"], reverse=True)
+    return output[:top_k]
 
 
 if __name__ == "__main__":
